@@ -5,16 +5,17 @@ import nltk
 import altair as alt
 from nltk import ngrams
 
-nltk.download('punkt', quiet=True)  # Ensure tokenizers are available
+# Force-download the 'punkt' tokenizer for NLTK in Python 3
+nltk.download('punkt', quiet=True)
 
-# =========================================================
-# EMBEDDED API KEY - For demonstration only!
-# =========================================================
+# -------------------------------------------------------------------------
+# EMBEDDED API KEY - For demonstration only! Replace with your actual key or secrets.
+# -------------------------------------------------------------------------
 API_KEY = "AIzaSyB2Dbul8LJQjAR-eFF307RjzLj9id8OO1I"
 
-# =========================================================
-# SAMPLE KEYWORDS
-# =========================================================
+# -------------------------------------------------------------------------
+# SAMPLE KEYWORDS FOR THE HFY NICHE
+# -------------------------------------------------------------------------
 KEYWORDS_LIST = [
     "HFY", "Humanity F Yeah", "HFY Humanity F*** Yeah", "hfy sci fi stories", "hfy stories",
     "hfy battle", "hfy scifi", "sci fi hfy", "hfy reddit stories", "hfy war stories",
@@ -23,20 +24,16 @@ KEYWORDS_LIST = [
     "best hfy story", "hfy war", "hfy human pets"
 ]
 
-# =========================================================
-# FUNCTIONS TO FETCH VIDEO & CHANNEL DATA
-# =========================================================
-
 def search_videos_for_keyword(keyword, max_results=15):
     """
-    Search YouTube for videos matching the given keyword.
-    Return a list of dictionaries: {video_id, channel_id, channel_title, video_title, published_at}
+    Search YouTube for videos matching 'keyword'.
+    Returns a list of dicts: {video_id, channel_id, channel_title, video_title, published_at}
     """
     url = "https://www.googleapis.com/youtube/v3/search"
     params = {
         "part": "snippet",
         "q": keyword,
-        "type": "video",          # <-- We search for videos, not channels
+        "type": "video",   # Searching for videos
         "maxResults": max_results,
         "key": API_KEY
     }
@@ -46,12 +43,12 @@ def search_videos_for_keyword(keyword, max_results=15):
     video_info = []
     if "items" in data:
         for item in data["items"]:
-            snippet = item["snippet"]
+            snippet = item.get("snippet", {})
             video_id = item["id"]["videoId"]
-            channel_id = snippet["channelId"]
-            channel_title = snippet["channelTitle"]
-            video_title = snippet["title"]
-            published_at = snippet["publishedAt"]
+            channel_id = snippet.get("channelId")
+            channel_title = snippet.get("channelTitle")
+            video_title = snippet.get("title")
+            published_at = snippet.get("publishedAt")
             video_info.append({
                 "video_id": video_id,
                 "channel_id": channel_id,
@@ -63,7 +60,7 @@ def search_videos_for_keyword(keyword, max_results=15):
 
 def get_channel_stats(channel_id):
     """
-    Get stats (subscriberCount, viewCount, videoCount) for a channel ID.
+    Get stats (subscriberCount, viewCount, videoCount) for a channel ID using the YouTube Data API.
     """
     url = f"https://www.googleapis.com/youtube/v3/channels?part=statistics&id={channel_id}&key={API_KEY}"
     response = requests.get(url)
@@ -75,7 +72,7 @@ def get_channel_stats(channel_id):
 
 def get_channel_videos(channel_id, max_results=5):
     """
-    Get recent videos for a channel by channel_id.
+    Retrieve recent videos from a given channel, up to 'max_results'.
     """
     url = f"https://www.googleapis.com/youtube/v3/search?part=snippet,id&channelId={channel_id}&order=date&maxResults={max_results}&key={API_KEY}"
     response = requests.get(url)
@@ -98,8 +95,7 @@ def get_channel_videos(channel_id, max_results=5):
 
 def analyze_videos(video_list):
     """
-    For each video in video_list, fetch its stats (views, likes, comments) using the Videos API.
-    Return a DataFrame with relevant columns.
+    For each video, fetch stats (views, likes, comments). Return a pandas DataFrame.
     """
     results = []
     for vid in video_list:
@@ -121,13 +117,12 @@ def analyze_videos(video_list):
     df = pd.DataFrame(results)
     return df
 
-# =========================================================
-# DEEPER ANALYSIS FUNCTIONS
-# =========================================================
-
 def get_top_bigrams(titles, top_n=5):
+    """
+    Tokenize video titles, find bigrams, and return the top_n frequent bigrams.
+    """
     text = " ".join(titles).lower()
-    tokens = nltk.word_tokenize(text)
+    tokens = nltk.word_tokenize(text)  # Requires punkt
     bigrams_list = list(ngrams(tokens, 2))
 
     freq_dict = {}
@@ -138,12 +133,16 @@ def get_top_bigrams(titles, top_n=5):
     return sorted_bigrams[:top_n]
 
 def find_deeper_patterns(df):
+    """
+    1. Mark "viral" videos (1.5× average view).
+    2. Like/view and comment/view ratios.
+    3. Top bigrams in titles.
+    """
     if df.empty:
         return {}, df
 
     avg_views = df["View Count"].mean()
-    df["Is Viral?"] = df["View Count"] > (1.5 * avg_views)  # > 150% of average
-
+    df["Is Viral?"] = df["View Count"] > (1.5 * avg_views)
     df["Like/View Ratio"] = df.apply(
         lambda row: row["Like Count"] / row["View Count"] if row["View Count"] != 0 else 0,
         axis=1
@@ -153,7 +152,8 @@ def find_deeper_patterns(df):
         axis=1
     )
 
-    sorted_bigrams = get_top_bigrams(df["Title"], top_n=5)
+    # Bigrams
+    sorted_bigrams = get_top_bigrams(df["Title"])
     patterns = {
         "average_views": round(avg_views, 2),
         "average_likes": round(df["Like Count"].mean(), 2),
@@ -177,33 +177,23 @@ def make_bar_chart(df, x_col, y_col, title="Bar Chart"):
     )
     return chart
 
-# =========================================================
-# STREAMLIT APP
-# =========================================================
-
 def main():
-    st.title("Topic-Based Channel Finder & Deep Analysis")
+    st.title("Topic-Based Channel Finder & Deep Analysis (Python 3)")
     st.markdown("""
-    **How this works**:
-    1. We take a list of keywords describing the HFY niche.
-    2. For each keyword, we **search for videos** (not channels!) that match that topic.
-    3. We collect the channels from those videos.
-    4. Rank all those channels by subscriber count.
-    5. Analyze the **top 5** channels in-depth (recent uploads, viral detection, bigrams, etc.).
+    This app is written explicitly for Python 3. All code is Python 3 compatible.
     """)
 
-    # Let the user adjust these
-    max_videos_search = st.slider("Max videos to fetch per keyword (for searching channels):", 5, 50, 15)
-    max_videos_per_channel = st.slider("How many recent videos to analyze for each channel:", 5, 20, 5)
+    max_videos_search = st.slider("Max videos to fetch per keyword:", 5, 50, 15)
+    max_videos_per_channel = st.slider("How many recent videos to analyze:", 5, 20, 5)
 
-    st.write("**Keywords being used**:", ", ".join(KEYWORDS_LIST))
-    
+    st.write("**Keywords used**:", ", ".join(KEYWORDS_LIST))
+
     if st.button("Run Analysis"):
-        st.write("### Step 1: Search for videos for each keyword, gather channel IDs")
-        channel_map = {}  # channel_id -> { 'channel_title': ..., 'subscriberCount': 0, ... }
+        st.write("### Step 1: Search videos for each keyword, gather channels")
+        channel_map = {}
 
         for kw in KEYWORDS_LIST:
-            st.write(f"Searching videos for keyword: **{kw}**")
+            st.write(f"Searching videos for: **{kw}**")
             video_results = search_videos_for_keyword(kw, max_results=max_videos_search)
 
             for vid in video_results:
@@ -217,26 +207,21 @@ def main():
                         "videoCount": 0
                     }
 
-        # If no channels found at all
         if not channel_map:
-            st.error("No channels found from these videos/keywords. Try changing the keywords or increasing max results.")
+            st.error("No channels found. Try adjusting keywords or 'max_videos_search'.")
             return
 
-        st.write(f"**Total unique channels discovered:** {len(channel_map)}")
+        st.write(f"**Total unique channels found**: {len(channel_map)}")
 
-        st.write("### Step 2: Fetch channel stats (subscribers, total views, etc.)")
+        st.write("### Step 2: Fetch channel stats")
         for ch_id, data in channel_map.items():
             stats = get_channel_stats(ch_id)
             data["subscriberCount"] = int(stats.get("subscriberCount", 0))
             data["viewCount"] = int(stats.get("viewCount", 0))
             data["videoCount"] = int(stats.get("videoCount", 0))
 
-        st.write("### Step 3: Pick Top 5 Channels by subscriberCount")
-        channels_sorted = sorted(
-            channel_map.items(), 
-            key=lambda x: x[1]["subscriberCount"], 
-            reverse=True
-        )
+        st.write("### Step 3: Select Top 5 Channels by Subscriber Count")
+        channels_sorted = sorted(channel_map.items(), key=lambda x: x[1]["subscriberCount"], reverse=True)
         top_5 = channels_sorted[:5]
 
         for idx, (ch_id, info) in enumerate(top_5, start=1):
@@ -246,62 +231,56 @@ def main():
             st.write(f"- **Total Videos**: {info['videoCount']:,}")
             st.write("---")
 
-        st.write("### Step 4: Deep Dive into Each of the Top 5 Channels")
+        st.write("### Step 4: Deep Dive on Each Top Channel")
         for idx, (ch_id, info) in enumerate(top_5, start=1):
             ch_title = info["channel_title"]
             st.subheader(f"Channel #{idx}: {ch_title}")
 
-            # Get recent videos
             videos = get_channel_videos(ch_id, max_results=max_videos_per_channel)
             if not videos:
-                st.write("No recent videos found or unable to fetch data.")
+                st.write("No recent videos found.")
                 continue
 
-            # Analyze them (views, likes, comments)
             df_videos = analyze_videos(videos)
             if df_videos.empty:
-                st.write("Could not fetch video stats for these uploads.")
+                st.write("Couldn't fetch video stats.")
                 continue
 
-            st.write("**Recent Videos Data**")
+            st.write("**Recent Videos**")
             st.dataframe(df_videos)
 
-            # Deeper patterns
             patterns, df_videos = find_deeper_patterns(df_videos)
-
-            # Summaries
-            st.write("**Key Insights**:")
+            st.write("**Stats & Patterns**:")
             st.write(f"- Average Views: {patterns.get('average_views', 0)}")
             st.write(f"- Average Likes: {patterns.get('average_likes', 0)}")
             st.write(f"- Average Comments: {patterns.get('average_comments', 0)}")
-            st.write(f"- Viral Threshold (1.5× avg views): {patterns.get('viral_threshold', 0)}")
+            st.write(f"- Viral Threshold: {patterns.get('viral_threshold', 0)}")
 
             viral_df = df_videos[df_videos["Is Viral?"]]
             if not viral_df.empty:
-                st.write("**Viral Videos** (exceeding threshold):")
+                st.write("**Viral Videos**:")
                 st.table(viral_df[["Title", "View Count", "Like Count", "Comment Count"]])
             else:
-                st.write("No videos exceeded the viral threshold in the latest uploads.")
+                st.write("No videos above the viral threshold.")
 
-            st.write("**Top 5 Bigrams in Titles**:")
             top_bigrams = patterns.get("top_5_bigrams", [])
+            st.write("**Top 5 Bigrams:**")
             for bigram, freq in top_bigrams:
-                st.write(f"- `{bigram}` appeared **{freq}** times")
+                st.write(f"- `{bigram}` → {freq}")
 
-            st.write("**Detailed Ratios** (Likes/Views, Comments/Views):")
+            st.write("**Like/View & Comment/View Ratios**")
             st.dataframe(df_videos[[
-                "Title", "View Count", "Like Count", "Comment Count", 
+                "Title", "View Count", "Like Count", "Comment Count",
                 "Like/View Ratio", "Comment/View Ratio", "Is Viral?"
             ]])
 
             st.write("**View Count Bar Chart**")
             chart_data = df_videos[["Title", "View Count"]].copy()
-            bar_chart = make_bar_chart(chart_data, "Title", "View Count", "Recent Videos: View Counts")
-            st.altair_chart(bar_chart, use_container_width=True)
-
+            chart = make_bar_chart(chart_data, "Title", "View Count", "Recent Videos: View Counts")
+            st.altair_chart(chart, use_container_width=True)
             st.write("---")
 
-        st.success("Analysis complete! Check the data above to see which channels stand out and why.")
+        st.success("Done analyzing! Enjoy your Python 3–powered insights.")
 
 if __name__ == "__main__":
     main()
