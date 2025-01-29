@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import streamlit as st
 import requests
 import pandas as pd
@@ -5,17 +7,29 @@ import nltk
 import altair as alt
 from nltk import ngrams
 
-# Force-download the 'punkt' tokenizer for NLTK in Python 3
-nltk.download('punkt', quiet=True)
+# -----------------------------------------------------------------------------
+# OPTION A: Stick with NLTK but specify language='english'
+# -----------------------------------------------------------------------------
+nltk.download('punkt', quiet=True)  # Ensure 'punkt' is downloaded
+USE_SIMPLE_TOKENIZER = False  # Switch to True if you want to skip NLTK entirely
 
-# -------------------------------------------------------------------------
-# EMBEDDED API KEY - For demonstration only! Replace with your actual key or secrets.
-# -------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# OPTION B: Simple Regex Tokenizer (No NLTK punkt needed)
+# -----------------------------------------------------------------------------
+import re
+
+def simple_tokenize(text: str):
+    """A naive regex-based tokenizer that splits on non-alphanumeric characters."""
+    return re.findall(r"\w+", text.lower())
+
+# -----------------------------------------------------------------------------
+# EMBEDDED API KEY - For demonstration only! Replace with your own or secrets.
+# -----------------------------------------------------------------------------
 API_KEY = "AIzaSyB2Dbul8LJQjAR-eFF307RjzLj9id8OO1I"
 
-# -------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # SAMPLE KEYWORDS FOR THE HFY NICHE
-# -------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 KEYWORDS_LIST = [
     "HFY", "Humanity F Yeah", "HFY Humanity F*** Yeah", "hfy sci fi stories", "hfy stories",
     "hfy battle", "hfy scifi", "sci fi hfy", "hfy reddit stories", "hfy war stories",
@@ -44,30 +58,30 @@ def search_videos_for_keyword(keyword, max_results=15):
     if "items" in data:
         for item in data["items"]:
             snippet = item.get("snippet", {})
-            video_id = item["id"]["videoId"]
+            video_id = item.get("id", {}).get("videoId")
             channel_id = snippet.get("channelId")
             channel_title = snippet.get("channelTitle")
             video_title = snippet.get("title")
             published_at = snippet.get("publishedAt")
-            video_info.append({
-                "video_id": video_id,
-                "channel_id": channel_id,
-                "channel_title": channel_title,
-                "video_title": video_title,
-                "published_at": published_at
-            })
+            if video_id and channel_id:
+                video_info.append({
+                    "video_id": video_id,
+                    "channel_id": channel_id,
+                    "channel_title": channel_title,
+                    "video_title": video_title,
+                    "published_at": published_at
+                })
     return video_info
 
 def get_channel_stats(channel_id):
     """
-    Get stats (subscriberCount, viewCount, videoCount) for a channel ID using the YouTube Data API.
+    Get stats (subscriberCount, viewCount, videoCount) for a channel ID.
     """
     url = f"https://www.googleapis.com/youtube/v3/channels?part=statistics&id={channel_id}&key={API_KEY}"
     response = requests.get(url)
     data = response.json()
     if "items" in data and len(data["items"]) > 0:
-        stats = data["items"][0]["statistics"]
-        return stats
+        return data["items"][0]["statistics"]
     return {}
 
 def get_channel_videos(channel_id, max_results=5):
@@ -81,10 +95,10 @@ def get_channel_videos(channel_id, max_results=5):
     video_data = []
     if "items" in data:
         for item in data["items"]:
-            kind = item["id"]["kind"]
+            kind = item.get("id", {}).get("kind")
             if kind == "youtube#video":
                 vid_id = item["id"]["videoId"]
-                snippet = item["snippet"]
+                snippet = item.get("snippet", {})
                 video_data.append({
                     "video_id": vid_id,
                     "title": snippet.get("title", ""),
@@ -114,15 +128,22 @@ def analyze_videos(video_list):
                 "Comment Count": int(details.get("commentCount", 0)),
                 "Description": vid["description"]
             })
-    df = pd.DataFrame(results)
-    return df
+    return pd.DataFrame(results)
 
 def get_top_bigrams(titles, top_n=5):
     """
     Tokenize video titles, find bigrams, and return the top_n frequent bigrams.
     """
     text = " ".join(titles).lower()
-    tokens = nltk.word_tokenize(text)  # Requires punkt
+
+    if USE_SIMPLE_TOKENIZER:
+        # Simple fallback: no NLTK dependence
+        tokens = simple_tokenize(text)
+    else:
+        # Use NLTK, specifying English
+        tokens = nltk.word_tokenize(text, language='english')
+
+    # Generate bigrams
     bigrams_list = list(ngrams(tokens, 2))
 
     freq_dict = {}
@@ -152,7 +173,6 @@ def find_deeper_patterns(df):
         axis=1
     )
 
-    # Bigrams
     sorted_bigrams = get_top_bigrams(df["Title"])
     patterns = {
         "average_views": round(avg_views, 2),
@@ -180,7 +200,9 @@ def make_bar_chart(df, x_col, y_col, title="Bar Chart"):
 def main():
     st.title("Topic-Based Channel Finder & Deep Analysis (Python 3)")
     st.markdown("""
-    This app is written explicitly for Python 3. All code is Python 3 compatible.
+    **Troubleshooting NLTK**: If you still get a LookupError for 'punkt',
+    try toggling the fallback tokenizer by setting USE_SIMPLE_TOKENIZER = True
+    near the top of this script.
     """)
 
     max_videos_search = st.slider("Max videos to fetch per keyword:", 5, 50, 15)
@@ -201,7 +223,7 @@ def main():
                 ch_title = vid["channel_title"]
                 if ch_id not in channel_map:
                     channel_map[ch_id] = {
-                        "channel_title": ch_title,
+                        "channel_title": ch_title or "Unknown Channel",
                         "subscriberCount": 0,
                         "viewCount": 0,
                         "videoCount": 0
