@@ -10,7 +10,7 @@ nltk.download('punkt', quiet=True)  # Ensure tokenizers are available
 # =========================================================
 # EMBEDDED API KEY - For demonstration only!
 # =========================================================
-API_KEY = "YOUR_API_KEY_HERE"
+API_KEY = "AIzaSyBrWecWtZjfdzTQCStr5Hw8iDUu_HrS13c"
 
 # =========================================================
 # SAMPLE KEYWORDS
